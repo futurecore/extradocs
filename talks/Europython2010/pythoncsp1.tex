@@ -1,0 +1,36 @@
+\documentclass{beamer}
+\usepackage{beamerthemeLuebeck}
+%\documentclass[a4paper, 11pt]{article}
+\usepackage{listings}
+\include{tango}
+%\definecolor{theWhite}{gray}{0.9}
+%\definecolor{theBlack}{gray}{0.0}
+%\lstset { basicstyle=\color{theWhite}, backgroundcolor=\color{theBlack} }
+
+\lstdefinelanguage{python_new}%
+  {morekeywords={access,and,break,class,continue,def,del,elif,else,%
+      except,exec,finally,for,from,global,if,import,in,is,lambda,not,%
+      or,pass,print,raise,return,try,with,while,True,False},%
+   sensitive=true,%
+   showspaces=false,%
+   showstringspaces=false,%
+   showtabs=false,%
+   morecomment=[l]\#,%
+   morecomment=[s]{'''}{'''},% used for documentation text
+   morecomment=[s]{"""}{"""},% added by Philipp Matthias Hahn
+   morestring=[b]',%
+   morestring=[b]"%
+  }
+
+\begin{document}
+
+
+\begin{frame}[fragile]
+  \frametitle{Hello world}
+\begin{lstlisting}[language=python_new]
+def foo(x):
+    print x
+\end{lstlisting}
+\end{frame}
+
+\end{document}

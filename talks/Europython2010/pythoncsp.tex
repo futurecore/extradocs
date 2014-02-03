@@ -1,0 +1,513 @@
+\documentclass{beamer}
+\usepackage{beamerthemeLuebeck}
+
+\usepackage{url}
+\usepackage{pgf}
+
+\include{tango}
+
+\lstloadlanguages{[ANSI]C,Java,ML,Prolog,Python,Ruby,SQL,XML}
+
+\lstdefinelanguage{python_new}%
+  {morekeywords={access,and,assert,break,class,continue,def,del,elif,else,%
+      except,exec,finally,for,from,global,if,import,in,is,lambda,not,%
+      or,pass,print,raise,return,try,while,True,False,yield},%
+   sensitive=true,%
+   showspaces=false,%
+   showstringspaces=false,%
+   showtabs=false,%
+   morecomment=[l]\#,%
+   morecomment=[s]{'''}{'''},% used for documentation text
+   morecomment=[s]{"""}{"""},% added by Philipp Matthias Hahn
+   morestring=[b]',%
+   morestring=[b]"%
+  }
+
+\newcommand{\pythoncsp}{\texttt{python-csp}}
+\usepackage{zed-csp}
+\usepackage{verbatim}
+
+\title{\pythoncsp{}: bringing OCCAM to Python}
+\author{Sarah Mount}
+\date{Europython 2010}
+
+%%% MEDIA
+\include{figs}
+\usepackage{multimedia}
+
+%%% START HERE ...
+\begin{document}
+
+\frame{\titlepage}
+
+\frame{\tableofcontents}
+
+
+\frame
+{
+  \pgfuseimage{csp-logo}
+  \begin{block}{This talk\ldots{}}
+    is all about the \pythoncsp{} project. There is a
+    similar project called PyCSP, these will merge over the next few
+    months. Current code base is here:
+    \url{http://code.google.com/p/python-csp} \\Please do contribute bug
+    fixes / issues / code / docs / rants / \ldots{}
+  \end{block}
+}
+
+
+\section{Ancient history}
+
+\frame
+{
+\pgfuseimage{inmos}
+\begin{block}{INMOS B0042 Board \copyright{} David May}
+The Transputer was the original ``multicore'' machine and was built to
+run the OCCAM language -- a realisation of CSP.
+\url{http://www.cs.bris.ac.uk/~dave/transputer.html}\\
+\end{block}
+}
+
+
+\frame
+{
+  \pgfuseimage{hoare}
+  \begin{block}{Tony Hoare}
+    Invented CSP, OCCAM, Quicksort and other baddass stuff. You may
+    remember him from such talks as his Europython 2009 Keynote.
+  \end{block}
+}
+
+
+
+\frame { 
+
+  \frametitle{OCCAM} 
+
+  OCCAM lives on in it's current implementation as OCCAM-$\pi$
+  \url{http://www.cs.kent.ac.uk/projects/ofa/kroc/}
+
+
+  It can run on Lego bricks, Arduino boards and other things. Like
+  Python it uses indentation to demark scope. Unlike Python OCCAM is
+  MOSTLY IN UPPERCASE.
+}
+
+
+\frame
+{
+  \frametitle{CSP and message passing}
+  \framesubtitle{This next bit will be revision for many of you!}
+  \pgfuseimage{cramming}
+}
+
+
+\frame
+{
+  \frametitle{Most of us think of programs like this}
+  \pgfuseimage{tm}
+  \begin{block}{}
+  \url{http://xkcd.com/205/}    
+  \end{block}
+}
+
+\frame
+{
+  \frametitle{This is the old ``standard'' model!}
+
+  \begin{itemize}
+  \item Multicore will soon take over the world (if it hasn't already).
+  \item Shared memory concurrency / parallelism is hard:
+    \begin{itemize}
+    \item Race hazards
+    \item Deadlock
+    \item Livelock
+    \item Tracking which lock goes with which data and what order
+      locks should be used.
+    \item Operating Systems are old news!
+    \end{itemize}
+  \end{itemize}
+}
+
+\frame
+{
+  \frametitle{Message passing}
+
+  \begin{definition}
+    In \emph{message passing} concurrency (or parallelism)
+    ``everything'' is a process and no data is shared between
+    processes. Instead, data is ``passed'' between \emph{channels}
+    which connect processes together. Think: OS processes and UNIX
+    pipes.
+  \end{definition}
+
+  \begin{itemize}
+  \item The \emph{actor} model (similar to Kamaelia) uses asynchronous
+    channels. Processes write data to a channel and continue execution. 
+  \item CSP (and $\pi$-calculus) use synchronous channels, or
+    \emph{rendezvous}, where a process writing to a channel has to
+    wait until the value has been read by another process before
+    proceeding.
+  \end{itemize}
+}
+
+\frame
+{
+  \frametitle{Process diagram}
+  \pgfuseimage{procs}
+}
+
+
+\frame
+{
+  \frametitle{Why synchronous channels?}
+  \pgfuseimage{causality}
+  \begin{block}{}
+    Leslie Lamport (1978). Time, clocks, and the ordering of events in a
+    distributed system". Communications of the ACM 21 (7)
+  \end{block}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{\pythoncsp{}: features and idioms}
+
+\subsection{Process creation}
+
+\begin{frame}[fragile]
+  \frametitle{Hello World!}
+  \begin{lstlisting}[language=python_new]
+from csp.cspprocess import * 
+
+@process
+def hello():
+    print 'Hello CSP world!'
+
+hello().start()
+  \end{lstlisting}
+\end{frame}
+
+
+
+\begin{frame}[fragile]
+  \frametitle{Example of process creation: web server}
+  \begin{lstlisting}[language=python_new]
+@process
+def server(host, port):
+  sock = socket.socket(...)
+  # Set up sockets
+  while True:
+      conn, addr = sock.accept()
+      request = conn.recv(4096).strip()
+      if request.startswith('GET'):
+          ok(request,conn).start()
+      else:
+          not_found(request,conn).start()
+  \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{Example of process creation: web server}
+  \begin{lstlisting}[language=python_new]
+@process
+def not_found(request, conn):
+    page = '<h1>File not found</h1>'
+    conn.send(response(404, 
+                       'Not Found', 
+                       page))
+    conn.shutdown(socket.SHUT_RDWR)
+    conn.close()
+    return
+  \end{lstlisting}
+\end{frame}
+
+
+\subsection{Parallel, sequential and repeated processes}
+
+\begin{frame}[fragile]
+  \frametitle{Combining processes: in parallel}
+  \begin{lstlisting}[language=python_new]
+    # With a Par object:
+    Par(p1, p2, p3, ... pn).start()
+    # With syntactic sugar:
+    p1 // (p2, p3, ... pn)
+    # RHS must be a sequence type.
+  \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{Combining processes: repeating a process sequentially}
+  \begin{lstlisting}[language=python_new]
+@process
+def hello():
+    print 'Hello CSP world!'
+if __name__ == '__main__':
+    hello() * 3
+    2 * hello()
+  \end{lstlisting}
+\end{frame}
+
+
+\subsection{Communication via channel read / writes}
+
+\begin{frame}[fragile]
+  \frametitle{Channels}
+  \begin{lstlisting}[language=python_new]
+@process
+def client(chan):
+    print chan.read()
+@process
+def server(chan):
+    chan.write('Hello CSP world!')
+
+if __name__ == '__main__':
+    ch = Channel()
+    Par(client(ch), server(ch)).start()
+  \end{lstlisting}
+\end{frame}
+
+
+\frame
+{
+  \frametitle{What you need to know about channels}
+
+  \begin{itemize}
+  \item Channels are currently UNIX pipes
+  \item This will likely change
+  \item Channel rendezvous is ``slow'' compared with JCSP:\\
+    200$\mu{}s$ \emph{vs} 16$\mu{}s$
+  \item This will be fixed by having channels written in C
+  \item Because channels are, at the OS level, open ``files'', there
+    can only be a limited number of them (around $300$ on my machine)
+  \item This makes me sad :-(
+  \end{itemize}
+}
+
+\subsection{More channels: ALTing and choice}
+
+\begin{frame}[fragile]
+  \frametitle{Message passing an responsiveness}
+
+  \begin{itemize}
+  \item This isn't about speed.
+  \item Sometimes, you have several channels and reading from them all
+    round-robin may reduce responsiveness if one channel read blocks
+    for a long time.
+  \end{itemize}
+This is BAD:
+  \begin{lstlisting}[language=python_new]
+@process
+def foo(channels):
+    for chan in channels:
+        print chan.read()
+  \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{ALTing and choice}
+  \begin{definition}
+    ALTing, or non-deterministic choice, \emph{selects} a channel to
+    read from from those channels which are ready to read from.
+  \end{definition}
+You can do this with (only) two channels:
+  \begin{lstlisting}[language=python_new]
+@process
+def foo(c1, c2):
+    print c1 | c2
+    print c1 | c2
+  \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{ALTing proper (many channels)}
+  \begin{lstlisting}[language=python_new]
+@process
+def foo(c1, c2, c3, c4, c5):
+    alt = Alt(c1, c2, c3, c4, c5)
+    # Choose random available offer
+    print alt.select()
+    # Avoid last selected channel
+    print alt.fair_select() 
+    # Choose channel with lowest index
+    print alt.priselect()   
+  \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{Syntactic sugar for ALTing}
+  \begin{lstlisting}[language=python_new]
+@process
+def foo(c1, c2, c3, c4, c5):
+    gen = Alt(c1, c2, c3, c4, c5)
+    print gen.next()
+    print gen.next()
+    print gen.next()
+    print gen.next()
+    print gen.next()
+  \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{ALTing: when you really, really must return right now}
+  \begin{lstlisting}[language=python_new]
+@process
+def foo(c1, c2, c3):
+    # Skip() will /always/ complete 
+    # a read immediately
+    gen = Alt(c1, c2, c3, Skip())
+    print gen.next()
+    ...
+  \end{lstlisting}
+\end{frame}
+
+
+\subsection{More channels: poisoning}
+
+\begin{frame}[fragile]
+  \frametitle{Channel poisoning}
+  \begin{definition}
+    Idiomatically in this style of programming most processes contain
+    infinite loops. \emph{Poisoning} a channel asks all processes
+    connected to that channel to shut down automatically. Each process
+    which has a poisoned channel will automatically poison any other
+    channels it is connected to. This way, a whole graph of connected
+    processes can be terminated, avoiding race conditions.
+  \end{definition}
+  \begin{lstlisting}[language=python_new]
+@process
+def foo(channel):
+    ...
+    channel.poison()
+  \end{lstlisting}
+\end{frame}
+
+
+\subsection{Producer / consumer or worker / farmer models}
+
+
+\frame
+{
+  \frametitle{A bigger example: Mandelbrot generator}
+  \pgfuseimage{mandel}
+}
+
+
+\begin{frame}[fragile]
+\begin{lstlisting}[language=python_new]
+@process
+def main(IMSIZE):
+    channels = []
+    # One producer + channel for each image column.
+    for x in range(IMSIZE[0]): 
+        channels.append(Channel())
+        processes.append(mandelbrot(x, ... channels[x]))
+    processes.insert(0, consume(IMSIZE, channels))
+    mandel = Par(*processes)
+    mandel.start()
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+\begin{lstlisting}[language=python_new]
+@process
+def mandelbrot(xcoord, cout):
+    # Do some maths here
+    cout.write(xcoord, column_data)
+\end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\begin{lstlisting}[language=python_new]
+@process
+def consumer(cins):
+    # Initialise PyGame...
+    gen = len(cins) * Alt(*cins)
+    for i in range(len(cins)):
+        xcoord, column = gen.next()
+        # Blit that column to screen
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            for channel in cins: 
+                channel.poison()
+            pygame.quit()
+\end{lstlisting}
+\end{frame}
+
+
+\section{Using built-in processes}
+
+\frame
+{
+  \frametitle{Oscilloscope}
+  \pgfuseimage{oscope}
+}
+
+\begin{frame}[fragile]
+\begin{lstlisting}[language=python_new]
+@process
+def Oscilloscope(inchan):
+    # Initialise PyGame
+    ydata = []
+    while not QUIT:
+        ydata.append(inchan.read())
+        ydata.pop(0)
+        # Blit data to screen...
+    # Deal with events
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+\begin{lstlisting}[language=python_new]
+from csp.builtins import Sin
+def trace_sin():
+    chans = Channel(), Channel()
+    Par(GenerateFloats(chans[0]),
+        Sin(chans[0], chans[1]), 
+        Oscilloscope(chans[1])).start()
+    return    
+\end{lstlisting}
+\end{frame}
+
+
+\frame
+{
+  \frametitle{Process diagram}
+  \pgfuseimage{procs}
+}
+
+
+
+\begin{frame}[fragile]
+\begin{lstlisting}[language=python_new]
+def trace_mux():
+    chans = [Channel() for i in range(6)]
+    par = Par(GenerateFloats(chans[0]),
+              Delta2(chans[0], chans[1], 
+                     chans[2]),
+              Cos(chans[1], chans[3]),
+              Sin(chans[2], chans[4]),
+              Mux2(chans[3], chans[4], 
+                   chans[5]),
+              Oscilloscope(chans[5]))
+    par.start()
+\end{lstlisting}
+\end{frame}
+
+
+\section{Future challenges}
+
+\frame
+{
+  \frametitle{Wiring}
+  \pgfuseimage{wiring}
+}
+
+
+\end{document}
+ 
