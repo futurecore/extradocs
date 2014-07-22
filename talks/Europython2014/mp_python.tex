@@ -1,20 +1,26 @@
 \documentclass[compress]{beamer}
 \usetheme{Boadilla}
 
-\usepackage{url}
-\usepackage{pgf}
+\usepackage{
+    url,
+    booktabs,
+    pgf,
+    tabularx,
+    verbatim,
+}
 
-\include{tango}
+\include{tango} % Uses listings package.
 
 \lstloadlanguages{[ANSI]C,Java,ML,Prolog,Python,Ruby,SQL,erlang,XML}
 
 \newcommand{\pythoncsp}{\texttt{python-csp}}
 \usepackage{zed-csp}
-\usepackage{verbatim}
 
 \title{Message-passing concurrency in Python}
-\author{Sarah Mount - @snim2}
+\author{Sarah Mount -- @snim2}
 \date{Europython 2014}
+
+\AtBeginSection{\frame{\sectionpage}}
 
 %%% MEDIA
 \include{figs}
@@ -24,17 +30,284 @@
 \begin{document}
 
 \logo{\pgfuseimage{uni}}
-
 \frame{\titlepage}
-
 \frame{\tableofcontents}
 
+\section{Why multicore?}
 
-\frame
-{
+\frame{    
+    \frametitle{Why multicore? (1/2)}
+    Feature size (mm) vs time (year). CPU sizes are shrinking!
+    Get the raw data here: \url{http://cpudb.stanford.edu/}
+    \centering{\pgfuseimage{moores-law}}
+}
+
+\frame{    
+    \frametitle{Why multicore? (2/2)}
+    New platforms, such as this board from Adapteva Inc. which reportedly
+    runs at 50GFPLOPS/Watt. Photo \copyright Adapteva Inc.
+    \centering{\pgfuseimage{parallella}}
 }
 
 
+\section{Message passing: an idea whose time has come (back)}
+
+\frame{    
+    \frametitle{Message passing concurrency}
+    \pgfuseimage{hoare}
+    \begin{block}{Tony Hoare}
+    CSP\footnote{other process algebras are available} (Communicating 
+    Sequential Processes) was invented by Tony Hoare in the late 70s / early 
+    80s as a response to the difficulty of reasoning about concurrent and 
+    parallel code. It was implemented as the OCCAM programming language
+    for the INMOS Transputer.
+    \end{block}
+}
+
+\frame{    
+    \frametitle{Message passing concurrency}
+    CSP\footnote{other process algebras are available} take the view 
+    that computation consists of \alert{communicating} processes which are 
+    individually made up of \alert{sequential} instructions. The communicating 
+    processes all run "at the same time" and \alert{share no data}. Because
+    they do not share data they have to cooperate by \alert{synchronising} on 
+    \alert{events}. A common form of synchronisation (but not the only one)
+    is to pass data between processes via \alert{channels}.\\
+    ~\\
+    \textbf{THINK} UNIX processes communicating via pipes.\\
+    ~\\
+    \textbf{BEWARE} CSP is an abstract ideas which use overloaded jargon, 
+    a \emph{process} or an \emph{event} need not be reified as an OS process or
+    GUI event\ldots
+}
+
+
+\frame{    
+    \frametitle{Benefits of message passing}
+    Threads and locking are tough! Deadlocks, starvation, race hazards are tough.
+    Locks do not compose easily, errors in locking cannot easily be 
+    recovered from, finding the right level of granularity is hard.\\
+    ~\\
+    CSP does not exhibit race hazards, there are no locks, the hairy 
+    details are all hidden away in either a language runtime or a library. WIN! 
+}
+
+
+\section{Message passing: all the cool kids are doing it}
+
+\begin{frame}[fragile]
+    \frametitle{UNIX}
+    \begin{lstlisting}[language=sh]
+$ cat mydata.csv | sort | uniq | wc -l
+    \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Go}
+    \begin{lstlisting}[language=C,morekeywords={func,make,go}]
+func main() {
+     mychannel := make(chan string)
+     go func() {
+          mychannel <- "Hello world!"
+     }()
+     fmt.Println(<-mychannel)
+}
+    \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Rust}
+    \begin{lstlisting}[language=Java,morekeywords={fn,let,spawn}]
+fn main() {
+    let (chan, port) = channel();
+
+    spawn(proc() {
+        chan.send("Hello world!");
+    });
+
+    println!("{:s}", port.recv());
+}
+    \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{Scala}
+    \begin{lstlisting}[language=Java,morekeywords={val,def,receive}]
+object Example {
+  class Example extends Actor {
+    def act = {
+      receive {
+        case msg => println(msg)
+      }
+    }
+  }
+  def main(args:Array[String]) {
+    val a = new Example 
+    a.start
+    a ! "Hello world!"
+  }
+}
+    \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{python-csp\footnote{http://github.com/snim2/python-csp}}
+    \begin{lstlisting}[language=python]
+@process
+def client(chan):
+    print chan.read()
+@process
+def server(chan):
+    chan.write('Hello world!')
+    
+if __name__ == '__main__':
+    ch = Channel()
+    Par(client(ch), server(ch)).start()
+    \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{naulang\footnote{Samuel Giles (2014) Is it possible to build a performant, dynamic language that supports concurrent models of computation? University of Wolverhampton BSc thesis}: building on the RPython toolchain}
+    \begin{lstlisting}[language=python,morekeywords={let,fn,async,print,chan}]
+let f = fn(mychannel) {
+    mychannel <- "Hello world!"
+}
+let mychannel = chan()
+async f(mychannel)
+print <: mychannel
+    \end{lstlisting}
+\end{frame}
+
+\frame{
+    \frametitle{naulang\footnote{Samuel Giles (2014) Is it possible to build a performant, dynamic language that supports concurrent models of computation? University of Wolverhampton BSc thesis}: building on the RPython toolchain}
+\begin{table}[]
+	\caption{Results from a tokenring benchmark @SamuelGiles\_}
+	\begin{tabular}[]{l|rrrr}
+    \toprule
+    ~ & \textbf{Min ($\mu$s)} & \textbf{Max ($\mu$s)} & \textbf{Mean ($\mu$s)} & \textbf{s.d.}\\
+    \midrule
+    Go 1.1.2 & 99167 & 132488 & 100656 & 1590\\
+    \midrule
+    Occam-$\pi$ & 68847 & 73355 & 69723 & 603\\
+    \midrule
+    naulang & 443316 & 486716 & 447894 & 6507\\
+    naulang JIT & 317510 & 589618 & 322304 & 10613\\
+    naulang (async) & 351677 & 490241 & 354325 & 6401\\
+    naulang JIT (async) & 42993 & 49496 & 44119 & 295\\
+    \bottomrule	
+    \end{tabular}
+    \centering{\url{http://github.com/samgiles/naulang}}
+\end{table}
+}
+
+\frame{
+    \frametitle{Aside: Did those benchmarks matter?}
+    That was a comparison between naulang and two compiled languages. The 
+    benchmark gives us some reason to suppose that a dynamic language
+    (built on the RPython chain) can perform reasonably well compared to
+    static languages.\\
+    ~\\
+    Does this matter? We don't want message passing to become a bottleneck
+    in optimising code\ldots
+}
+
+\section{Design choices in message passing languages and libraries}
+
+\frame{    
+    \frametitle{Synchronous vs. asynchronous channels}
+    
+    \textbf{Synchronous} channels block on read / write - examples include 
+    OCCAM, JCSP, python-csp, UNIX pipes. \textbf{Asynchronous} channels are 
+    non-blocking - examples include Scala, Rust. Some languages give you both
+    - examples include Go.\\
+    
+    \textbf{Synchronous} channels are easier to reason about (formally) and
+    many people believe are easier to use. \\
+    ~\\
+    \textbf{Asynchronous} channels are sometimes thought to be faster. Like
+    most claims about speed, this isn't always true.
+}
+
+\begin{frame}[fragile]    
+    \frametitle{Uni or bidirectional channels? Point to point?}
+
+    The JCSP\footnote{\url{http://www.cs.kent.ac.uk/projects/ofa/jcsp/}} project
+    (for Java) separates out different sorts of channels types, e.g.:
+    \begin{itemize}
+    \item \verb!AnyToAnyChannel!
+    \item \verb!AnyToOneChannel!
+    \item \verb!OneToAnyChannel!
+    \item \verb!OneToOneChannel!
+    \end{itemize}
+    This isn't very Pythonic, but it can catch errors in setting up a network
+    of channels in a message passing system.
+\end{frame}
+
+\frame{    
+    \frametitle{Mobile or immobile channels}
+    
+    A \textbf{mobile} channels can be sent over another channel. This means 
+    that the network of channels can change its topology dynamically at runtime.
+    Why might we want to do this? 
+    \begin{itemize}
+    \item our process are actually running over a network of machines or on
+    a manycore processor. We want to migrate some processes to perform load 
+    balancing or due to some failure condition within a network.
+    \item some processes have finished their work and any channels associated
+    with them need to be either \alert{poisoned} (destroyed) or re-routed 
+    elsewhere.
+    \end{itemize}
+}
+
+\frame{    
+    \frametitle{Reifying sequential processes}
+    In \textbf{CSP} and \textbf{actor model} languages the paradigm is of 
+    a number of \emph{sequential processes} which run in parallel and 
+    communicate via channels (think: UNIX processes pipes). It is up to the 
+    language designer how to reify those sequential processes. Common choices are:
+    \begin{description}
+    \item [1 CSP process is 1 coroutine] \alert{very fast message passing} (OCCAM-$\pi$ 
+    reports a small number of ns), cannot take advantage of multicore.
+    \item [1 CSP process is 1 OS thread] slower message passing; \alert{can take advantage of multicore}
+    \item [1 CSP process is 1 OS process] very slow message passing; \alert{can migrate CSP processes across a network to other machines}
+    \item [1 CSP processes is 1 coroutine] many coroutines are multiplexed onto an OS thread
+    \item [1 CSP processes is 1 OS thread] many OS threads are multiplexed onto an OS process
+    \item [etc.]
+    \end{description} 
+}
+
+\section{Message passing in Python too!}
+
+\frame{    
+    \frametitle{So many EP14 talks!}
+    Several EP14 talks involve coroutines (lightweight threads) and / or channels:
+    \begin{description}
+    \item [Daniel Pope] Wedneday 11:00
+    \item [Christian Tismer, Anselm Kruis] Wednesday 11:45
+    \item [Richard Wall] Friday 11:00
+    \item [Benoit Chesneau] Friday 12:00
+    \item [Dougal Matthew] Friday 12:00
+    \end{description} 
+    Message-passing has already entered the Python ecosystem and there are
+    constructs such as pipes and queues in the \texttt{multiprocessing} library.
+    Could we do better by adopting some ideas from other languages?
+}
+
+
+\frame{    
+    \frametitle{The (near) future}
+    Python for the Parallella will be coming out this Summer, thanks to funding
+    from the RAE. If you are interested in this, please keep an eye on the
+    \alert{futurecore}\footnote{http://github.com/futurecore/} GitHub
+    organization.\\
+    ~\\
+    python-csp is moving back into regular development. Will it ever be 
+    fast?
+}
+
+
+\frame{
+  \frametitle{Thank you.}
+}
 
 \end{document}
- 
