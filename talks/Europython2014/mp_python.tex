@@ -18,7 +18,7 @@
 
 \title{Message-passing concurrency in Python}
 \author{Sarah Mount -- @snim2}
-\date{Europython 2014}
+\date{EuroPython 2014}
 
 \AtBeginSection{\frame{\sectionpage}}
 
@@ -222,7 +222,11 @@ print <: mychannel
     - examples include Go.\\
     
     \textbf{Synchronous} channels are easier to reason about (formally) and
-    many people believe are easier to use. \\
+    many people believe are easier to use. Most languagues include some extra
+    features to support synchronicity, e.g. if you are waiting to read from a 
+    number of channels you can \alert{select} or \alert{ALTernate} one that
+    is ready soonest. \emph{Aside: with some checks and balances to avoid
+    starvation!}\\
     ~\\
     \textbf{Asynchronous} channels are sometimes thought to be faster. Like
     most claims about speed, this isn't always true.
@@ -231,8 +235,9 @@ print <: mychannel
 \begin{frame}[fragile]    
     \frametitle{Uni or bidirectional channels? Point to point?}
 
-    The JCSP\footnote{\url{http://www.cs.kent.ac.uk/projects/ofa/jcsp/}} project
-    (for Java) separates out different sorts of channels types, e.g.:
+    The well engineered Java CSP (JCSP)
+    JCSP\footnote{\url{http://www.cs.kent.ac.uk/projects/ofa/jcsp/}} project
+    separates out different sorts of channels types, e.g.:
     \begin{itemize}
     \item \verb!AnyToAnyChannel!
     \item \verb!AnyToOneChannel!
@@ -246,16 +251,19 @@ print <: mychannel
 \frame{    
     \frametitle{Mobile or immobile channels}
     
-    A \textbf{mobile} channels can be sent over another channel. This means 
-    that the network of channels can change its topology dynamically at runtime.
-    Why might we want to do this? 
+    A \textbf{mobile} channels can be sent over another channel at runtime. 
+    This means that the network of channels can change its topology dynamically 
+    at runtime. Why might we want to do this? 
     \begin{itemize}
-    \item our process are actually running over a network of machines or on
-    a manycore processor. We want to migrate some processes to perform load 
-    balancing or due to some failure condition within a network.
-    \item some processes have finished their work and any channels associated
-    with them need to be either \alert{poisoned} (destroyed) or re-routed 
-    elsewhere.
+    \item our processes are actually running over a network of machines or on
+    a manycore processor. We want to migrate some processes from one node to 
+    another to perform load balancing or due to some failure condition within a
+    network.
+    \item some processes have finished their work and need to be 
+    \alert{poisoned} (destroyed) and any channels associated with them need to
+    be either (destroyed) or re-routed elsewhere. \emph{Aside: what happens
+    if we want to poison processes and channels that form a cyclic graph? What 
+    if one process dies before it can poison others connected to it?}
     \end{itemize}
 }
 
@@ -280,29 +288,38 @@ print <: mychannel
 
 \frame{    
     \frametitle{So many EP14 talks!}
-    Several EP14 talks involve coroutines (lightweight threads) and / or channels:
+    Does Python have message passing? Sort of\ldots{}\\
+    Several EP14 talks involve coroutines (lightweight threads) and / or 
+    channels, and I'm not even counting really cool innovations like
+    PyPy-stm:
     \begin{description}
-    \item [Daniel Pope] Wedneday 11:00
-    \item [Christian Tismer, Anselm Kruis] Wednesday 11:45
-    \item [Richard Wall] Friday 11:00
-    \item [Benoit Chesneau] Friday 12:00
-    \item [Dougal Matthew] Friday 12:00
+    \item [Daniel Pope] Wedneday 11:00 (on gevent)
+    \item [Christian Tismer, Anselm Kruis] Wednesday 11:45 (on Stackless)
+    \item [Richard Wall] Friday 11:00 (on Twisted)
+    \item [Benoit Chesneau] Friday 12:00 (on Offset)
+    \item [Dougal Matthew] Friday 12:00 (on asyncio)
     \end{description} 
     Message-passing has already entered the Python ecosystem and there are
     constructs such as pipes and queues in the \texttt{multiprocessing} library.
-    Could we do better by adopting some ideas from other languages?
+    Could we do better by adopting some of the ideas above from other languages?
 }
 
 
 \frame{    
     \frametitle{The (near) future}
     Python for the Parallella will be coming out this Summer, thanks to funding
-    from the RAE. If you are interested in this, please keep an eye on the
+    from the Royal Academy of Engineering. If you are interested in this, please 
+    keep an eye on the
     \alert{futurecore}\footnote{http://github.com/futurecore/} GitHub
     organization.\\
     ~\\
-    python-csp is moving back into regular development. Will it ever be 
-    fast?
+    python-csp is (slowly) moving back into regular development. Will it ever be 
+    fast?\\
+    ~\\
+    naulang development continues at \url{http://github.com/samgiles/naulang}
+    I will be at the PyPy spring on Saturday working on this.\\
+    ~\\
+    Pull requests and constructive criticism \emph{always} welcome!
 }
 
 
