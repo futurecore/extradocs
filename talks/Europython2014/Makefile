@@ -22,6 +22,8 @@ GEN_PDF_FLAGS=
 GEN_PS=dvips $(GEN_PS_FLAGS) -f $(DOC).dvi -o $(DOC).ps
 GEN_PDF=dvipdfm $(DOC).dvi
 
+LINT=chktex
+
 HOSTNAME=$(shell hostname)
 VIEW_FILE=$(DOC).pdf
 
@@ -30,6 +32,9 @@ VIEW_2_TEXT=ps2ascii
 WORD_COUNT=wc -w
 
 GENERATED=$(DOC).log $(DOC).toc $(DOC).dvi $(DOC).ps $(DOC).pdf $(DOC).txt $(DOC).lol $(DOC).los $(DOC).lof  $(DOC).blg $(DOC).bbl *.aux $(DOC).idx $(DOC).ind $(DOC).ilg $(DOC).snm $(DOC).nav *.out $(DOC).vrb
+
+.PHONY: all pdflatex clean dvi ps pdf bib view edit lint
+
 ### Generate everything except a .ps file.
 all:    pdflatex view
 #dvi pdf view
@@ -67,4 +72,6 @@ view:
 ### Edit the TeX file.
 edit:
 	$(EDITOR) $(DOC).tex &
-
+### Lintt he document
+lint:
+	$(LINT) $(DOC)
