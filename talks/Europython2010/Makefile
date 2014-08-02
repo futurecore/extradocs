@@ -29,7 +29,7 @@ VIEW_2_TEXT=ps2ascii
 
 WORD_COUNT=wc -w
 
-GENERATED=$(DOC).log $(DOC).toc $(DOC).dvi $(DOC).ps $(DOC).pdf $(DOC).txt $(DOC).lol $(DOC).los $(DOC).lof  $(DOC).blg $(DOC).bbl $(DOC).aux $(DOC).idx $(DOC).ind $(DOC).ilg
+GENERATED=$(DOC).log $(DOC).toc $(DOC).dvi $(DOC).ps $(DOC).pdf $(DOC).txt $(DOC).lol $(DOC).los $(DOC).lof  $(DOC).blg $(DOC).bbl $(DOC).aux $(DOC).idx $(DOC).ind $(DOC).ilg *.aux $(DOC).nav $(DOC).out $(DOC).snm $(DOC).vrb
 ### Generate everything except a .ps file.
 all:    pdflatex view
 #dvi pdf view
